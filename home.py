@@ -2,8 +2,8 @@ import streamlit as st
 from pytubefix import YouTube
 from pytubefix.cli import on_progress
 from pytubefix.helpers import safe_filename
-import os
 import subprocess
+import shlex
 
 # Título de la aplicación
 st.title("Descargar Video y Audio de YouTube")
@@ -26,11 +26,20 @@ def on_progress_callback(stream, chunk, bytes_remaining):
         progress_bar.progress(percentage_of_completion / 100)
         status_text.text(f"Descargando: {int(percentage_of_completion)}%")
 
+# Función para escapar nombres de archivos
+def escape_filename(filename):
+    return shlex.quote(filename)
+
 # Función para combinar video y audio usando FFmpeg
 def combine_video_audio(video_path, audio_path, output_path):
     try:
-        # Ajustar el comando de FFmpeg
-        command = f"ffmpeg -i {video_path} -i {audio_path} -c:v copy -c:a aac -strict experimental {output_path}"
+        # Escapar los nombres de archivo
+        video_path_escaped = escape_filename(video_path)
+        audio_path_escaped = escape_filename(audio_path)
+        output_path_escaped = escape_filename(output_path)
+
+        # Ajustar el comando de FFmpeg con comillas dobles
+        command = f'ffmpeg -i "{video_path_escaped}" -i "{audio_path_escaped}" -c:v copy -c:a aac -strict experimental "{output_path_escaped}"'
         st.write(f"Comando FFmpeg: {command}")  # Mostrar el comando para depuración
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
         
@@ -38,8 +47,8 @@ def combine_video_audio(video_path, audio_path, output_path):
         if result.returncode != 0:
             st.error(f"Error al combinar video y audio: {result.stderr}")
         else:
-            st.success(f"Video y audio combinados en: {output_path}")
-            return output_path
+            st.success(f"Video y audio combinados en: {output_path_escaped}")
+            return output_path_escaped
     except Exception as e:
         st.error(f"Error al combinar video y audio: {e}")
         return None
@@ -50,9 +59,6 @@ def download_video_audio_separately(youtube_url, resolution):
         yt = YouTube(youtube_url, on_progress_callback=on_progress_callback)
         st.write(f"Título del video: {yt.title}")
         
-        # Convertir la resolución a número (ej. '720p' -> 720)
-        resolution_number = int(resolution[:-1])
-
         # Descargar video y audio por separado
         st.write(f"Descargando video y audio por separado para la resolución {resolution}...")
         
