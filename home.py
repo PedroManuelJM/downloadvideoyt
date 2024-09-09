@@ -29,11 +29,18 @@ def on_progress_callback(stream, chunk, bytes_remaining):
 # Función para combinar video y audio usando FFmpeg
 def combine_video_audio(video_path, audio_path, output_path):
     try:
+        # Ajustar el comando de FFmpeg
         command = f"ffmpeg -i {video_path} -i {audio_path} -c:v copy -c:a aac -strict experimental {output_path}"
-        subprocess.run(command, shell=True, check=True)
-        st.success(f"Video y audio combinados en: {output_path}")
-        return output_path
-    except subprocess.CalledProcessError as e:
+        st.write(f"Comando FFmpeg: {command}")  # Mostrar el comando para depuración
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        
+        # Mostrar salida de error si ocurre
+        if result.returncode != 0:
+            st.error(f"Error al combinar video y audio: {result.stderr}")
+        else:
+            st.success(f"Video y audio combinados en: {output_path}")
+            return output_path
+    except Exception as e:
         st.error(f"Error al combinar video y audio: {e}")
         return None
 
