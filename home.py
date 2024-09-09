@@ -1,14 +1,18 @@
 import streamlit as st
-from pytubefix import YouTube
-from pytubefix.cli import on_progress
-from pytubefix.helpers import safe_filename
+from pytube import YouTube
 import os
+import time
+import random
 
 # Título de la aplicación
 st.title("Descargar Video y Audio de YouTube")
 
 # Input para la URL del video de YouTube
 url = st.text_input("Ingresa la URL del video de YouTube:")
+
+# Input para el retraso entre descargas
+sleep_time_min = st.slider("Tiempo mínimo de retraso (en segundos) entre la descarga del video y el audio:", min_value=0, max_value=60, value=5)
+sleep_time_max = st.slider("Tiempo máximo de retraso (en segundos) entre la descarga del video y el audio:", min_value=0, max_value=60, value=10)
 
 # Barra de progreso
 progress_bar = None
@@ -30,72 +34,37 @@ def download_video_audio(youtube_url, resolution):
     try:
         yt = YouTube(youtube_url, on_progress_callback=on_progress_callback)
         st.write(f"Título del video: {yt.title}")
-        
-        # Convertir la resolución a número (ej. '720p' -> 720)
-        resolution_number = int(resolution[:-1])  
 
-        if resolution_number >= 720:
-            # Descargar video y audio por separado
-            st.write("Resolución 720p o mayor detectada, descargando video y audio por separado...")
-            
-            # Filtrar el stream de video para la resolución seleccionada
-            video_stream = yt.streams.filter(res=resolution, mime_type="video/mp4").first()
-            
-            # Filtrar el stream de solo audio
-            audio_stream = yt.streams.filter(only_audio=True, mime_type="audio/mp4").first()
-
-            if video_stream and audio_stream:
-                # Descargar el video (sin audio)
-                st.write("Descargando video...")
-                video_filename = f"{safe_filename(yt.title)}_video_{resolution}.mp4"
-                video_path = video_stream.download(filename=video_filename)
-                st.write("Video descargado.")
-                
-                # Descargar el audio
-                st.write("Descargando audio...")
-                audio_filename = f"{safe_filename(yt.title)}_audio.mp4"
-                audio_path = audio_stream.download(filename=audio_filename)
-                st.write("Audio descargado.")
-                
-                return video_path, audio_path
-            else:
-                st.error("No se encontraron streams de video o audio adecuados.")
-                return None, None
+        # Descargar video y audio por separado
+        st.write("Descargando video y audio por separado...")
         
+        # Filtrar el stream de video para la resolución seleccionada
+        video_stream = yt.streams.filter(res=resolution, mime_type="video/mp4").first()
+        # Filtrar el stream de solo audio
+        audio_stream = yt.streams.filter(only_audio=True, mime_type="audio/mp4").first()
+
+        if video_stream and audio_stream:
+            # Descargar el video (sin audio)
+            st.write("Descargando video...")
+            video_filename = f"{yt.title}_video_{resolution}.mp4"
+            video_path = video_stream.download(filename=video_filename)
+            st.write("Video descargado.")
+            
+            # Retrasar la descarga de audio para evitar detección de bot
+            sleep_time = random.uniform(sleep_time_min, sleep_time_max)
+            st.write(f"Esperando {sleep_time:.2f} segundos antes de descargar el audio...")
+            time.sleep(sleep_time)
+
+            # Descargar el audio
+            st.write("Descargando audio...")
+            audio_filename = f"{yt.title}_audio.mp4"
+            audio_path = audio_stream.download(filename=audio_filename)
+            st.write("Audio descargado.")
+
+            return video_path, audio_path
         else:
-            # Descargar video con audio combinado (muxed) o video sin audio
-            st.write("Resolución menor a 720p detectada, buscando video con audio combinado...")
-            
-            # Buscar el stream combinado (video + audio)
-            combined_stream = yt.streams.filter(res=resolution, mime_type="video/mp4", progressive=True).first()
-
-            if combined_stream:
-                # Descargar el video con audio
-                st.write("Descargando video con audio...")
-                video_filename = f"{safe_filename(yt.title)}_combined_{resolution}.mp4"
-                video_path = combined_stream.download(filename=video_filename)
-                st.write("Video con audio descargado.")
-                
-                return video_path, None
-            else:
-                st.write("No se encontró stream con video y audio combinados. Descargando por separado...")
-                
-                # Descargar video y audio por separado si no hay combinación
-                video_stream = yt.streams.filter(res=resolution, mime_type="video/mp4").first()
-                audio_stream = yt.streams.filter(only_audio=True, mime_type="audio/mp4").first()
-
-                if video_stream and audio_stream:
-                    st.write("Descargando video sin audio...")
-                    video_filename = f"{safe_filename(yt.title)}_video_{resolution}.mp4"
-                    video_path = video_stream.download(filename=video_filename)
-                    st.write("Descargando audio por separado...")
-                    audio_filename = f"{safe_filename(yt.title)}_audio.mp4"
-                    audio_path = audio_stream.download(filename=audio_filename)
-
-                    return video_path, audio_path
-                else:
-                    st.error("No se encontraron streams de video o audio adecuados.")
-                    return None, None
+            st.error("No se encontraron streams de video o audio adecuados.")
+            return None, None
 
     except Exception as e:
         st.error(f"Error al descargar el video: {e}")
